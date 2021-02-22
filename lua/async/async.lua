@@ -9,8 +9,7 @@ local pong = function (func, callback)
     local res = {co.resume(thread, ...)}
     local stat = res[1]
     local ret = {select(2, unpack(res))}
-    -- assert(stat, "Status should be true")
-    assert(stat, ret)
+    assert(stat, "Status should be true")
     if co.status(thread) == "dead" then
       (callback or function () end)(unpack(ret))
     else
@@ -86,12 +85,9 @@ local async_wrap = function(func)
   end
 end
 
-return setmetatable(
-  {
-    sync = async_wrap,
-    wait = await,
-    wait_all = await_all,
-    wrap = wrap,
-    uv = require"async/uv_async"
-  }, { __index = function(t, k) return require("async/uv_async") end }
-)
+return {
+  sync = async_wrap,
+  wait = await,
+  wait_all = await_all,
+  wrap = wrap,
+} 
