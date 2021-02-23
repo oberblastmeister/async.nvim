@@ -1,4 +1,5 @@
 local exports = require('async.async')
-table.insert(exports, require('async.uv_async'))
+exports.uv = require('async.uv_async')
+exports.utils = require('async.utils')
 
 return exports

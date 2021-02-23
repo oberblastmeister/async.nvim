@@ -3,16 +3,6 @@ local uv = vim.loop
 
 local M = {}
 
--- misc
-M.sleep = a.wrap(function(ms, callback)
-  local timer = uv.new_timer()
-  uv.timer_start(timer, ms, 0, function()
-    uv.timer_stop(timer)
-    uv.close(timer)
-    callback()
-  end)
-end)
-
 -- filesystem
 M.fs_open = a.wrap(uv.fs_open)
 M.fs_fstat = a.wrap(uv.fs_fstat)
