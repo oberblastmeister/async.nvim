@@ -88,4 +88,5 @@ return {
   wait = await,
   wait_all = await_all,
   wrap = wrap,
+  wait_for_textlock = wrap(vim.schedule)
 } 

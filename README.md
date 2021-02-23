@@ -41,3 +41,7 @@ local read_file = a.sync(function(path)
   assert(not err, err)
 end)
 ```
+
+## Credit
+
+This library was made possible by [neovim-async-tutorial](https://github.com/ms-jpq/neovim-async-tutorial). It is also inspired by some parts of [neogit](https://github.com/TimUntersberger/neogit/pull/42)
