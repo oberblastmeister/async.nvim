@@ -1,11 +1,25 @@
 local co = coroutine
+local uv = vim.loop
+
+local thread_loop = function(thread, callback)
+  local idle = uv.new_idle()
+  idle:start(function()
+    local success = co.resume(thread)
+    assert(success, "Coroutine failed")
+
+    if co.status(thread) == "dead" then
+      idle:stop()
+      callback()
+    end
+  end)
+end
 
 -- use with wrap
 local pong = function(func, callback)
   assert(type(func) == "function", "type error :: expected func")
   local thread = co.create(func)
-  local step = nil
-  step = function (...)
+  local step
+  step = function(...)
     local res = {co.resume(thread, ...)}
     local stat = res[1]
     local ret = {select(2, unpack(res))}
@@ -21,10 +35,9 @@ local pong = function(func, callback)
   step()
 end
 
-
 -- use with pong, creates thunk factory
 local wrap = function(func)
-  assert(type(func) == "function", "type error :: expected func")
+  assert(type(func) == "function", "type error :: expected func, got " .. type(func))
 
   return function(...)
     local params = {...}
@@ -35,6 +48,7 @@ local wrap = function(func)
   end
 end
 
+local thread_loop_async = wrap(thread_loop)
 
 -- many thunks -> single thunk
 local join = function(thunks)
@@ -48,7 +62,7 @@ local join = function(thunks)
     end
     for i, tk in ipairs(thunks) do
       assert(type(tk) == "function", "thunk must be function")
-      local callback = function (...)
+      local callback = function(...)
         acc[i] = {...}
         done = done + 1
         if done == len then
@@ -61,6 +75,15 @@ local join = function(thunks)
   return thunk
 end
 
+local function run(future)
+  future()
+end
+
+local function run_all(futures)
+  for _, future in ipairs(futures) do
+    future()
+  end
+end
 
 -- sugar over coroutine
 local await = function(defer)
@@ -83,10 +106,45 @@ local async = function(func)
   end
 end
 
+local pong_loop = async(function(func, callback)
+  assert(type(func) == "function", "type error :: expected func")
+  local thread = co.create(func)
+
+  local _step
+  _step = function(...)
+    local res = {co.resume(thread, ...)}
+    local stat = res[1]
+    local ret = {select(2, unpack(res))}
+    assert(stat, "Status should be true")
+    if co.status(thread) == "dead" then
+      (callback or function() end)(unpack(ret))
+    else
+      assert(#ret == 1, "expected a single return value")
+      assert(type(ret[1]) == "function", "type error :: expected func")
+      -- yield before calling the next one
+      co.yield()
+      ret[1](_step)
+    end
+  end
+
+  local step = function()
+    thread_loop(co.create(_step))
+  end
+
+  step()
+end)
+
+--- because idle is a bad name
+local spawn = wrap(pong_loop)
+
 return {
   sync = async,
+  join = join,
   wait = await,
   wait_all = await_all,
+  run = run,
+  run_all = run_all,
+  spawn = spawn,
   wrap = wrap,
   wait_for_textlock = wrap(vim.schedule)
 } 

@@ -1,4 +1,5 @@
 local a = require('async/async')
+local co = coroutine
 local VecDeque = require('async/helpers').VecDeque
 local uv = vim.loop
 
@@ -23,6 +24,25 @@ M.id = a.sync(function(...)
   return ...
 end)
 
+M.thread_loop = function(thread, callback)
+  local idle = uv.new_idle()
+  idle:start(function()
+    local success = co.resume(thread)
+    assert(success, "Coroutine failed")
+
+    if co.status(thread) == "dead" then
+      idle:stop()
+      callback()
+    end
+  end)
+end
+
+M.thread_loop_async = a.wrap(M.thread_loop)
+
+M.yield_now = a.sync(function()
+  a.wait(M.id())
+end)
+
 local Condvar = {}
 Condvar.__index = Condvar
 
@@ -37,6 +57,7 @@ Condvar.wait = a.wrap(function(self, callback)
   table.insert(self.handles, callback)
 end)
 
+--- not an async function
 function Condvar:notify_all()
   for _, callback in ipairs(self.handles) do
     callback()
@@ -44,6 +65,7 @@ function Condvar:notify_all()
   self.handles = {} -- reset all handles as they have been used up
 end
 
+--- not an async function
 function Condvar:notify_one()
   if #self.handles == 0 then return end
 
@@ -53,5 +75,41 @@ function Condvar:notify_one()
 end
 
 M.Condvar = Condvar
+
+M.channel = {}
+
+---comment
+---@return function
+---@return any
+M.channel.oneshot = function()
+  local val = nil
+  local saved_callback = nil
+
+  --- sender is not async
+  --- sends a value
+  local sender = function(t)
+    if val ~= nil then
+      error('Oneshot channel can only send one value!')
+    end
+
+    val = t
+    saved_callback(val)
+  end
+
+  --- receiver is async
+  --- blocks until a value is received
+  local receiver = a.wrap(function(callback)
+    if callback ~= nil then
+      error('Oneshot channel can only receive one value!')
+    end
+
+    saved_callback = callback
+  end)
+
+  return sender, receiver
+end
+
+M.channel.mpsc = function()
+end
 
 return M

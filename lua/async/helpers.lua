@@ -1,13 +1,5 @@
 local M = {}
 
-M.curry1 = function(func)
-  return function(x)
-    return function(...)
-      func(x, ...)
-    end
-  end
-end
-
 VecDeque = {}
 VecDeque.__index = VecDeque
 
